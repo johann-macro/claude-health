@@ -1,0 +1,21 @@
+:root{color-scheme:dark;--bg:#070C11;--karte:rgba(255,255,255,.05);--text:#fff;
+  --dim:#9BA1A9;--linie:rgba(255,255,255,.08);--gruen:#00F19F}
+*{box-sizing:border-box}
+body{margin:0;background:
+  radial-gradient(78% 40% at 64% 0%,rgba(28,116,116,.16) 0%,rgba(28,116,116,0) 64%),
+  linear-gradient(180deg,#0A121A 0%,#070C12 56%,#04080C 100%);background-color:var(--bg);
+  color:var(--text);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:720px;margin:0 auto;padding:48px 22px 64px}
+.marke{font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;font-size:26px}
+.marke b{font-family:inherit;font-weight:600;font-size:19px;letter-spacing:.2em;margin-left:.4em;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+h1{font-size:30px;line-height:1.2;letter-spacing:-.02em;margin:34px 0 10px}
+h2{font-size:18px;margin:34px 0 8px}
+p,li{color:rgba(255,255,255,.84)}
+.klein{color:var(--dim);font-size:14px}
+.karte{background:var(--karte);border-radius:16px;padding:18px 20px;margin:18px 0}
+a{color:var(--gruen)}
+nav{display:flex;gap:18px;flex-wrap:wrap;margin-top:40px;padding-top:18px;
+  border-top:1px solid var(--linie);font-size:14px}
+code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:5px;font-size:.92em}
