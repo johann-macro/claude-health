@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Claude Health - Firestore-Sicherheitsregeln
+//
+// Grundsatz: Ohne Anmeldung geht gar nichts, und angemeldet kommt man
+// ausschliesslich an die eigenen Daten. Der Abgleich laeuft ueber ein
+// Dienstkonto; das umgeht diese Regeln absichtlich und schreibt nur in den
+// Zweig des eigenen Nutzers.
+//
+// Aufbau der Daten:
+//   nutzer/<uid>                    Profil, Einstellungen, Stand des Abgleichs
+//   nutzer/<uid>/tage/<JJJJ-MM-TT>  ein Dokument je Tag (Messwerte, Schlaf)
+//   nutzer/<uid>/logbuch/<JJJJ-MM-TT>
+//   nutzer/<uid>/plan/<name>
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /nutzer/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Alles unterhalb gehoert demselben Nutzer
+      match /{unterpfad=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Alles andere ist verboten.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
