@@ -1,0 +1,24 @@
+# --- Zugangsdaten: niemals versionieren ---
+.secrets/
+*.token
+*.json.token
+client_secret*.json
+
+# --- Gesundheitsdaten: privat ---
+health/
+dashboard/dashboard.html
+docs/api-proben/
+docs/referenz/
+sicherungen/
+
+# --- Laufzeit ---
+.venv/
+logs/
+__pycache__/
+*.pyc
+.DS_Store
+
+# --- Sicherungskopien beim Umbauen ---
+*.bak
+*.py.bak
+template.html.bak*

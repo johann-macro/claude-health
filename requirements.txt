@@ -1,0 +1,7 @@
+# Google Health API (Nachfolger der Fitbit Web API, abgeschaltet 30.09.2026)
+requests==2.32.3
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
+
+# Firebase: Anmeldung und Datenbank fuer alle Geraete
+firebase-admin==7.5.0

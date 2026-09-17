@@ -1,0 +1,31 @@
+# GitHub schaltet geplante Ablaeufe in oeffentlichen Repositories ab, wenn
+# 60 Tage lang nichts passiert ist. Da hier nur Daten fliessen und kein Code,
+# koennte genau das den Abgleich stillschweigend beenden.
+#
+# Dieser Ablauf schreibt deshalb einmal im Monat einen Zeitstempel und setzt
+# damit die Uhr zurueck. Er aendert sonst nichts.
+
+name: Wachhalten
+
+on:
+  schedule:
+    - cron: "0 5 1 * *"     # am 1. jedes Monats
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  wachhalten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zeitstempel schreiben
+        run: |
+          date -u "+%Y-%m-%d %H:%M UTC" > .github/letzter-lauf.txt
+          git config user.name  "Claude Health Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/letzter-lauf.txt
+          git diff --cached --quiet || git commit -m "Wachhalten: geplante Ablaeufe aktiv halten"
+          git push
