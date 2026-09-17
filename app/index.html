@@ -1861,6 +1861,7 @@ function vSchlaf(){
       `<span><i style="background:${STUFENFARBEN[i]}"></i>${n}</span>`).join("")}
   </div>
 
+  ${leistungTeile(s)}
   ${schlafEinsicht(d, zeilen)}
 
   <div class="abschnitt" style="padding-bottom:2px">Der Schlaf der letzten Nacht</div>
@@ -1881,6 +1882,44 @@ function vSchlaf(){
   <div class="abschnitt" id="coachziel">Schlaf-Coach</div>
   ${schlafCoach(s)}
   ${rohtabelle()}`;
+}
+
+// Woraus sich die Schlafleistung zusammensetzt. Nur sichtbar, wenn die
+// Aufschluesselung vorliegt - aeltere Naechte ohne Phasenerkennung haben sie
+// nicht, und dann wird hier nichts behauptet.
+const LEISTUNG_TEILE = [
+  ["dauer",      "Dauer vs. Bedarf",  45],
+  ["erholsam",   "Erholsamer Schlaf", 25],
+  ["ungestoert", "Ungestört",         20],
+  ["einschlafen","Einschlafen",       10],
+];
+function leistungTeile(s){
+  const teile = s.performance_teile;
+  if(!teile || !Object.keys(teile).length) return "";
+  const vorhanden = LEISTUNG_TEILE.filter(([k]) => teile[k] != null);
+  const summe = vorhanden.reduce((a,[,,g]) => a + g, 0);
+  return `<div class="karte">
+    ${calcBadge("gewichtetes Mittel aus Dauer, Tief- und REM-Schlaf, Wachzeit und Einschlafdauer")}
+    <div class="lbl" style="color:#fff;font-size:11.5px;font-weight:800;margin-bottom:4px"
+      >Woraus sich die Schlafleistung ergibt</div>
+    ${vorhanden.map(([k,l,g]) => {
+      const v = teile[k];
+      const c = v >= 85 ? "var(--green)" : v >= 65 ? "#8A939D" : "var(--z5)";
+      return `<div style="padding:9px 0">
+        <div class="row" style="margin-bottom:6px">
+          <span class="small" style="font-weight:700;color:#fff">${esc(l)}
+            <span class="muted" style="font-weight:400">· ${Math.round(g/summe*100)} %</span></span>
+          <span class="num small" style="color:${c}">${v} %</span></div>
+        <div class="bar"><span style="width:${v}%;background:${c}"></span></div>
+      </div>`;}).join("")}
+    <div class="chartnote">Lange zu schlafen ist nur die halbe Miete: Wer neun Stunden im
+      Bett liegt, davon eine wach ist und kaum Tiefschlaf bekommt, hat sich schlechter
+      erholt als jemand mit sieben ruhigen Stunden. ${s.stages ? `Tiefschlaf und REM
+      zusammen ergaben ${hm(s.stages.deep + s.stages.rem)} h${
+      s.awake_min != null ? `, wach warst du ${s.awake_min} Minuten` : ""}${
+      s.fall_asleep_min != null ? `, eingeschlafen bist du nach ${s.fall_asleep_min} Minuten`
+      : ""}.` : ""}</div>
+  </div>`;
 }
 
 // Die vier Zeilen unter dem Ring. Jede hat eigene Schwellen - eine gemeinsame
@@ -1917,7 +1956,7 @@ function schlafEinsicht(d, zeilen){
       ${schwach.st < 2
         ? `Am stärksten trägt „${esc(stark.l)}“ mit ${stark.v} % dazu bei, der schwächste
            Punkt ist „${esc(schwach.l)}“ mit ${schwach.v} %.`
-        : "Alle vier Teilwerte liegen im optimalen Bereich."}</div>
+        : "Alle vier Kennzahlen unter dem Ring liegen im optimalen Bereich."}</div>
     <button class="insightlink" data-schlafcoach="1">Mehr im Schlaf-Coach ${ICON_PFEIL_R}</button>
   </div>`;
 }
@@ -3196,7 +3235,13 @@ const SCHLAF_INFO = {
     "Er läuft von 0 bis 3 und wird aus Herzfrequenz und Herzfrequenzvariabilität gebildet — " +
     "berechnet, nicht gemessen."],
   leistung: ["Schlafleistung",
-    "Die Schlafleistung setzt die geschlafene Zeit ins Verhältnis zu deinem Bedarf in dieser Nacht.",
+    "Die Schlafleistung fasst vier gemessene Größen zusammen: die Dauer gegenüber deinem "
+    + "Bedarf (45 %), Tiefschlaf und REM zusammen (25 %), die Wachzeit während der Nacht "
+    + "(20 %) und die Zeit bis zum festen Schlaf (10 %).",
+    "Die Schwellen dafür stammen aus der Schlafforschung und wandern nicht mit deinem "
+    + "eigenen Durchschnitt mit — sonst bekäme ein halbes Jahr schlechter Schlaf mit der "
+    + "Zeit gute Noten. Was sich sehr wohl anpasst, ist der Bedarf: Er steigt mit der "
+    + "Belastung des Vortags und mit angesammeltem Schlafdefizit.",
     "Die vier Zeilen darunter zeigen, woraus sich die Qualität der Nacht zusammensetzt. Jede " +
     "hat ihre eigenen Schwellen — 94 % Effizienz sind gut, 94 % wären beim Schlafstress " +
     "eine katastrophale Nacht."],

@@ -292,7 +292,10 @@ def erzeuge(tage_gesamt: int = TAGE) -> dict:
 
         zubett_min = (22 * 60 + int(rng.gauss(75, 42))) % (24 * 60)
         aufwach_min = (zubett_min + zeit_im_bett) % (24 * 60)
-        leistung = metrics.sleep_performance(dauer, wunsch)
+        einschlafen = int(max(2, rng.gauss(14, 7)))
+        leistung, leistung_teile = metrics.sleep_performance_detail(
+            dauer, wunsch, tief_min=tief, rem_min=rem, wach_min=wach,
+            einschlaf_min=einschlafen)
 
         # Konsistenz und erholsamer Anteil werden hergeleitet, nicht gewuerfelt.
         bett_verlauf.append(zubett_min)
@@ -311,6 +314,9 @@ def erzeuge(tage_gesamt: int = TAGE) -> dict:
             "time_in_bed_min": zeit_im_bett,
             "need": bedarf,
             "performance": leistung,
+            "performance_teile": leistung_teile,
+            "awake_min": wach,
+            "fall_asleep_min": einschlafen,
             "efficiency": effizienz,
             "consistency": konsistenz,
             "restorative": erholsam,

@@ -272,6 +272,15 @@ def schlaf_umrechnen(sitzung: dict) -> dict:
     im_bett = int(zahl(z.get("minutesInSleepPeriod"), 0))
     geschlafen = int(zahl(z.get("minutesAsleep"), 0))
     wach = int(zahl(z.get("minutesAwake"), max(0, im_bett - geschlafen)))
+    # minutesToFallAsleep meldet Google haeufig als 0. Die Fitbit-App zeigt
+    # stattdessen die Zeit bis zum FESTEN Schlaf - und die steht in den Phasen:
+    # der Abstand vom Zubettgehen bis zum ersten Tief- oder REM-Block.
+    einschlafen = zahl(z.get("minutesToFallAsleep"), 0) or None
+    for block in sitzung.get("stages") or []:
+        if block.get("type") in ("DEEP", "REM"):
+            b_von = lokal(block["startTime"], versatz(block.get("startUtcOffset")))
+            einschlafen = max(0, int((b_von - start).total_seconds() // 60))
+            break
     if not im_bett:
         im_bett = geschlafen + wach
 
@@ -283,6 +292,8 @@ def schlaf_umrechnen(sitzung: dict) -> dict:
         "efficiency": int(round(geschlafen / im_bett * 100)) if im_bett else None,
         "stages": phasen,
         "wake_count": wach_bloecke + len(sitzung.get("shortAwakenings") or []),
+        "awake_min": wach,
+        "fall_asleep_min": einschlafen,
         "_start": start,
         "_ende": ende,
     }
@@ -495,8 +506,13 @@ def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
             bett_verlauf.append(schlaf["bedtime_min"])
             wach_verlauf.append(schlaf["waketime_min"])
             schlaf["need"] = bedarf
-            schlaf["performance"] = metrics.sleep_performance(schlaf["duration_min"],
-                                                              bedarf["total"])
+            # Dauer allein reicht nicht: Tiefschlaf, REM, Wachzeit und
+            # Einschlafdauer gehen mit ein (siehe metrics.sleep_performance_detail)
+            schlaf["performance"], schlaf["performance_teile"] =                 metrics.sleep_performance_detail(
+                    schlaf["duration_min"], bedarf["total"],
+                    tief_min=schlaf["stages"]["deep"], rem_min=schlaf["stages"]["rem"],
+                    wach_min=schlaf.get("awake_min"),
+                    einschlaf_min=schlaf.get("fall_asleep_min"))
             schlaf["consistency"] = metrics.sleep_consistency(bett_verlauf[-14:],
                                                               wach_verlauf[-14:])
             schlaf["restorative"] = metrics.restorative_share(schlaf["stages"])

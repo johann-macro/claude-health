@@ -189,10 +189,76 @@ def sleep_need_minutes(
     }
 
 
-def sleep_performance(duration_min: float, need_min: float) -> int:
+def _kurve(wert: float, punkte: list[tuple[float, float]]) -> float:
+    """Stueckweise lineare Bewertung entlang gegebener Stuetzstellen.
+
+    punkte sind (Messwert, Punktzahl) und muessen nach Messwert sortiert sein.
+    Ausserhalb der Spanne gilt der jeweils aeussere Punkt.
+    """
+    if wert <= punkte[0][0]:
+        return punkte[0][1]
+    for (x1, y1), (x2, y2) in zip(punkte, punkte[1:]):
+        if wert <= x2:
+            anteil = (wert - x1) / (x2 - x1)
+            return y1 + (y2 - y1) * anteil
+    return punkte[-1][1]
+
+
+# Stuetzstellen der vier Teilbewertungen. Sie stammen aus der Schlafforschung,
+# nicht aus persoenlichen Mittelwerten - und das ist Absicht: Wer ein halbes
+# Jahr schlecht schlaeft, bekaeme sonst dafuer gute Noten, weil sein eigener
+# Durchschnitt mitgewandert waere. Was sich sehr wohl anpasst, ist der BEDARF
+# (sleep_need_minutes) - er waechst mit Belastung und Schlafdefizit.
+ERHOLSAM_KURVE = [(45, 0), (90, 40), (120, 70), (180, 92), (240, 100)]
+WACH_KURVE = [(5, 100), (10, 100), (20, 80), (30, 60), (45, 35), (75, 0)]
+EINSCHLAF_KURVE = [(5, 100), (15, 100), (30, 75), (45, 50), (90, 0)]
+
+GEWICHTE = {"dauer": 0.45, "erholsam": 0.25, "ungestoert": 0.20, "einschlafen": 0.10}
+
+
+def sleep_performance_detail(
+    duration_min: float,
+    need_min: float,
+    *,
+    tief_min: float | None = None,
+    rem_min: float | None = None,
+    wach_min: float | None = None,
+    einschlaf_min: float | None = None,
+) -> tuple[int, dict]:
+    """Schlafleistung aus Dauer UND Qualitaet.
+
+    Lange zu schlafen ist nur die halbe Miete. Wer neun Stunden im Bett liegt,
+    davon aber eine Stunde wach ist und kaum Tiefschlaf bekommt, hat sich
+    schlechter erholt als jemand mit sieben ruhigen Stunden. Deshalb fliessen
+    vier gemessene Groessen ein:
+
+        Dauer gegen Bedarf   45 %   wie viel vom Noetigen erreicht wurde
+        Erholsamer Schlaf    25 %   Tiefschlaf + REM in Minuten
+        Ungestoert           20 %   Wachzeit waehrend der Nacht
+        Einschlafen          10 %   Zeit bis zum festen Schlaf
+
+    Fehlt eine Groesse (aeltere Naechte ohne Phasenerkennung), wird ihr Gewicht
+    auf die vorhandenen verteilt - geschaetzt wird nichts.
+    """
     if need_min <= 0:
-        return 0
-    return int(round(_clamp(duration_min / need_min * 100.0, 0, 100)))
+        return 0, {}
+
+    teile: dict[str, float] = {"dauer": _clamp(duration_min / need_min * 100.0, 0, 100)}
+    if tief_min is not None and rem_min is not None:
+        teile["erholsam"] = _kurve(tief_min + rem_min, ERHOLSAM_KURVE)
+    if wach_min is not None:
+        teile["ungestoert"] = _kurve(wach_min, WACH_KURVE)
+    if einschlaf_min is not None:
+        teile["einschlafen"] = _kurve(einschlaf_min, EINSCHLAF_KURVE)
+
+    summe_gewicht = sum(GEWICHTE[k] for k in teile)
+    punkte = sum(teile[k] * GEWICHTE[k] for k in teile) / summe_gewicht
+    return int(round(_clamp(punkte, 0, 100))), {k: int(round(v)) for k, v in teile.items()}
+
+
+def sleep_performance(duration_min: float, need_min: float, **qualitaet) -> int:
+    """Nur die Punktzahl - fuer Aufrufer, die die Aufschluesselung nicht brauchen."""
+    return sleep_performance_detail(duration_min, need_min, **qualitaet)[0]
 
 
 def stress_value(
