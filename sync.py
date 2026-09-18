@@ -21,6 +21,7 @@ Aufruf:
     python sync.py                  letzte 7 Tage
     python sync.py 90               letzte 90 Tage (erster Lauf)
     python sync.py 30 --nurdatei    ohne Firestore, nur health/data.json
+    python sync.py --schnell        nur heute, und nur wenn die Uhr Neues hochgeladen hat
 """
 from __future__ import annotations
 
@@ -400,7 +401,25 @@ def nacht_stress(reihe_gestern: list[dict], reihe_heute: list[dict],
 
 
 # ------------------------------------------------------------------ Aufbau
-def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
+def vorgeschichte(von: date, nur_datei: bool) -> list[dict]:
+    """Die bereits gespeicherten Tage vor dem Abgleichzeitraum (bis 45 Tage).
+    Nur lueckenlos bis zum Vortag - sonst stimmen "gestern"-Werte nicht."""
+    if nur_datei:
+        return []
+    try:
+        import speicher
+        tage = speicher.tage_lesen(ab=(von - timedelta(days=45)).isoformat())
+    except Exception as fehler:          # ohne Datenbank: wie bisher rechnen
+        print(f"  Vorgeschichte nicht lesbar: {fehler}")
+        return []
+    tage = [t for t in tage if t.get("date", "") < von.isoformat()]
+    if tage and tage[-1]["date"] != (von - timedelta(days=1)).isoformat():
+        tage.append({})                  # Luecke: "gestern" ist unbekannt
+    return tage
+
+
+def abgleich(tage_zurueck: int = 7, nur_datei: bool = False,
+             datei: bool = True) -> dict:
     api = HealthAPI()
     bis = date.today()
     von = bis - timedelta(days=tage_zurueck - 1)
@@ -470,6 +489,27 @@ def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
     strain_gestern = 0.0
     temp_verlauf: list[float] = []
     stress_gestern: list[dict] = []
+
+    # Vorgeschichte aus Firestore: Der Abgleich holt nur wenige Tage frisch
+    # von Google. Basislinien (30 Tage), Schlafdefizit, Regelmaessigkeit und
+    # Temperatur brauchen aber die Wochen davor - sonst bliebe die Erholung
+    # ewig in der Kalibrierung.
+    for alt_tag in vorgeschichte(von, nur_datei):
+        r, s = alt_tag.get("recovery") or {}, alt_tag.get("sleep") or {}
+        for schluessel in verlauf:
+            verlauf[schluessel].append(r.get(schluessel))
+        if r.get("skin_temp_c") is not None:
+            temp_verlauf.append(r["skin_temp_c"])
+        if s.get("duration_min") is not None:
+            if s.get("bedtime_min") is not None:
+                bett_verlauf.append(s["bedtime_min"])
+                wach_verlauf.append(s["waketime_min"])
+            bedarf_alt = (s.get("need") or {}).get("total")
+            if bedarf_alt:
+                schlafdefizit = max(0.0, schlafdefizit
+                                    + (bedarf_alt - s["duration_min"]) * 0.5)
+        strain_gestern = (alt_tag.get("strain") or {}).get("score") or 0.0
+        stress_gestern = (alt_tag.get("stress") or {}).get("series") or []
     detail_ab = alle_daten[-DETAIL_TAGE] if len(alle_daten) > DETAIL_TAGE else alle_daten[0]
 
     for datum in alle_daten:
@@ -600,6 +640,7 @@ def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
                 "calibrating": not basis.ausreichend,
                 "hrv": hrv, "rhr": int(rhf) if rhf else None, "resp": atem, "spo2": spo2,
                 "skin_temp_dev": haut_abw,
+                "skin_temp_c": nacht_temp,
                 "drivers": {k: round(v, 2) for k, v in beitraege.items()},
             },
             "sleep": schlaf,
@@ -625,9 +666,13 @@ def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
         "days": tage,
     }
 
-    HEALTH_DIR.mkdir(parents=True, exist_ok=True)
-    DATA_JSON.write_text(json.dumps(datensatz, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"\n  health/data.json geschrieben ({len(tage)} Tage)")
+    # Der schnelle Abgleich rechnet nur heute - die lokale Datei behaelt
+    # dann ihren vollen Zeitraum.
+    if datei:
+        HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+        DATA_JSON.write_text(json.dumps(datensatz, ensure_ascii=False, indent=1),
+                             encoding="utf-8")
+        print(f"\n  health/data.json geschrieben ({len(tage)} Tage)")
 
     if not nur_datei:
         import speicher
@@ -640,13 +685,35 @@ def abgleich(tage_zurueck: int = 7, nur_datei: bool = False) -> dict:
     return datensatz
 
 
+def neues_vom_geraet() -> tuple[bool, str | None]:
+    """Hat die Uhr seit dem letzten Abgleich etwas hochgeladen?
+
+    Ein einziger kleiner Aufruf. Fitbit laedt nur in Schueben hoch; dazwischen
+    koennte man beliebig oft fragen und bekaeme dieselben Werte. So kann der
+    schnelle Abgleich jede Minute laufen, rechnet aber nur, wenn es lohnt."""
+    import speicher
+    geraete = (HealthAPI().einzeln("users/me/pairedDevices").daten or {})         .get("pairedDevices") or []
+    jetzt = max((g.get("lastSyncTime") or "" for g in geraete), default="") or None
+    gespeichert = ((speicher.profil_lesen().get("profil") or {}).get("geraet") or {})         .get("letzter_abgleich")
+    return jetzt != gespeichert, jetzt
+
+
 def main() -> int:
     tage = 7
     nur_datei = "--nurdatei" in sys.argv
+    if "--schnell" in sys.argv:
+        # Nur heute (plus die Nacht davor), und nur wenn es Neues gibt.
+        # Die gruendlichen Laeufe ueber mehrere Tage fangen Nachlieferungen.
+        neu, stand = neues_vom_geraet()
+        if not neu:
+            print(f"Nichts Neues von der Uhr (letzter Upload {stand}).")
+            return 0
+        print(f"Neuer Upload der Uhr: {stand}")
+        tage = 1
     for arg in sys.argv[1:]:
         if arg.isdigit():
             tage = max(1, min(180, int(arg)))
-    datensatz = abgleich(tage, nur_datei)
+    datensatz = abgleich(tage, nur_datei, datei="--schnell" not in sys.argv)
 
     print("\n" + "=" * 64)
     for tag in datensatz["days"][-7:]:

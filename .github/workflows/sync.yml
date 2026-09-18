@@ -14,9 +14,12 @@ name: Abgleich
 
 on:
   schedule:
-    # Alle zwei Stunden. Fitbit laedt selbst nur beim Synchronisieren der App
-    # hoch - oefter abzufragen bringt keine neueren Werte, kostet aber Laeufe.
-    - cron: "25 */2 * * *"
+    # Schnell: alle 5 Minuten (kuerzester Takt, den GitHub erlaubt). Fragt
+    # erst nur, ob die Uhr Neues hochgeladen hat - dann rund 3 Sekunden.
+    # Gerechnet wird nur bei einem neuen Upload, und dann nur heute.
+    - cron: "*/5 * * * *"
+    # Gruendlich: alle 3 Stunden drei Tage, fuer Nachlieferungen von Google.
+    - cron: "40 */3 * * *"
   workflow_dispatch:        # erlaubt das Ausloesen von Hand
 
 permissions:
@@ -46,9 +49,14 @@ jobs:
         env:
           GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
           FIREBASE_DIENSTKONTO: ${{ secrets.FIREBASE_DIENSTKONTO }}
-        # Drei Tage: neu dazugekommene Werte werden oft Stunden spaeter
+        # Gruendlich drei Tage: neu dazugekommene Werte werden oft Stunden spaeter
         # nachgeliefert, und der Schlaf der letzten Nacht braucht den Vortag.
-        run: python sync.py 3
+        run: |
+          if [ "${{ github.event.schedule }}" = "*/5 * * * *" ]; then
+            python sync.py --schnell
+          else
+            python sync.py 3
+          fi
 
       # health/data.json entsteht beim Lauf und enthaelt Gesundheitsdaten.
       # Es wird bewusst NICHT hochgeladen - die Daten stehen in Firestore.
