@@ -143,6 +143,11 @@
     document.getElementById("ob-spaeter").addEventListener("click", () => { box.hidden = true; });
   }
 
+  /* ---------- Installierbar und offline startbar ------------------------ */
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(e => console.warn("Offline-Hülle:", e.message));
+  }
+
   /* ---------- Ablauf ------------------------------------------------------ */
   auth.onAuthStateChanged(async (nutzer) => {
     if (!nutzer) {

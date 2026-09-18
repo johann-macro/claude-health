@@ -5411,7 +5411,8 @@ function vProfil(){
     return `<div class="karte">
       <div class="kopfzeile" style="margin-bottom:12px"><span class="t">Profil bearbeiten</span></div>
       <div style="font-size:13px;line-height:1.55;color:var(--dim);margin-bottom:16px">
-        Alles bleibt in diesem Browser und wird nirgendwohin geschickt. Das Geburtsdatum ist der
+        ${window.abmelden ? "Wird in deinem geschützten Konto gespeichert und ist auf all deinen Geräten gleich."
+          : "Alles bleibt in diesem Browser und wird nirgendwohin geschickt."} Das Geburtsdatum ist der
         Bezugspunkt fuer das biologische Alter.</div>
       <div class="feld" style="margin-bottom:12px"><label for="p-name">Name</label>
         <input type="text" id="p-name" maxlength="40" placeholder="Johann Mueller"
@@ -5535,7 +5536,9 @@ function vProfil(){
         <span class="muted" style="font-size:13px;font-weight:700">x</span></div>`).join("")}
   </div>
 
-  ${bioAlterBlock(p, alter)}`;
+  ${bioAlterBlock(p, alter)}
+  ${window.abmelden ? `<button class="obspaeter" id="p-abmelden"
+      style="margin:26px auto 8px;font-size:13px">Abmelden</button>` : ""}`;
 }
 
 // Das biologische Alter bleibt erhalten - es stand ausdruecklich nicht zur
@@ -6929,6 +6932,7 @@ document.addEventListener("click", e=>{
     return;
   }
 
+  if(e.target.closest("#p-abmelden")){ window.abmelden(); return; }
   // Profil speichern / bearbeiten
   if(e.target.closest("#p-save")){
     const name = document.getElementById("p-name").value.trim();
