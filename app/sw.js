@@ -6,7 +6,7 @@
  * sofort ankommt. Firebase-Bibliotheken: erst Ablage, sie tragen die
  * Versionsnummer im Pfad und aendern sich nie.
  */
-const ABLAGE = "claude-health-v1";
+const ABLAGE = "claude-health-v2";
 const HUELLE = ["./", "index.html", "start.js", "manifest.webmanifest",
                 "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png",
                 "../js/firebase-config.js"];

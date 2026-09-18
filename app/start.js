@@ -66,6 +66,45 @@
     }
   });
 
+  const FEHLER = {
+    "auth/invalid-credential": "E-Mail oder Passwort stimmt nicht.",
+    "auth/invalid-email": "Das ist keine gültige E-Mail-Adresse.",
+    "auth/missing-email": "Bitte oben zuerst deine E-Mail eingeben.",
+    "auth/popup-closed-by-user": "Google-Anmeldung abgebrochen.",
+    "auth/cancelled-popup-request": "Google-Anmeldung abgebrochen.",
+    "auth/unauthorized-domain": "Google-Anmeldung ist für diese Adresse noch nicht freigegeben.",
+    "auth/operation-not-allowed": "Google-Anmeldung ist in Firebase noch nicht eingeschaltet.",
+    "auth/network-request-failed": "Keine Verbindung.",
+    "auth/popup-blocked": "Das Anmeldefenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.",
+  };
+
+  /* Google ueber ein Anmeldefenster. Eine Weiterleitung waere die
+   * Alternative, verliert aber in Safari und neuerem Chrome ihr Ergebnis,
+   * weil die Anmeldeseite auf firebaseapp.com liegt und nicht auf dieser
+   * Adresse. Gleiche E-Mail wie beim bestehenden Konto = gleiches Konto. */
+  document.getElementById("a-google").addEventListener("click", async () => {
+    const anbieter = new firebase.auth.GoogleAuthProvider();
+    anbieter.setCustomParameters({ prompt: "select_account" });
+    meldung("Google-Anmeldung läuft …", "still");
+    try {
+      await auth.signInWithPopup(anbieter);
+    } catch (err) {
+      meldung(FEHLER[err.code] || ("Google-Anmeldung fehlgeschlagen: " + err.code));
+    }
+  });
+
+  document.getElementById("a-vergessen").addEventListener("click", async () => {
+    const mail = document.getElementById("a-mail").value.trim();
+    if (!mail) return meldung(FEHLER["auth/missing-email"]);
+    try {
+      await auth.sendPasswordResetEmail(mail);
+      meldung("Falls es ein Konto gibt, ist ein Link zum Zurücksetzen unterwegs. " +
+              "Auch im Spam-Ordner nachsehen.", "still");
+    } catch (err) {
+      meldung(FEHLER[err.code] || ("Nicht gesendet: " + err.code));
+    }
+  });
+
   window.abmelden = function () {
     try { localStorage.removeItem(CACHE); } catch (e) { /* egal */ }
     auth.signOut().then(() => location.reload());
